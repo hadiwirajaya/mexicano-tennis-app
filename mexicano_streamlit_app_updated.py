@@ -16,11 +16,15 @@ st.title("🎾 Mexicano Tennis Format")
 # Step 1: Player Input with Limit
 with st.form("player_input"):
     player_input = st.text_area("Enter 12 player names (one per line):", height=250)
-    player_lines = player_input.strip().split("\n") if player_input.strip() else []
+    # Clean input: remove empty lines and extra whitespace
+    player_lines = [line.strip() for line in player_input.strip().split("\n") if line.strip()]
     st.caption(f"Players entered: {len(player_lines)} / 12")
-    
+
     if len(player_lines) > 12:
         st.error("⚠️ You have entered more than 12 players. Please reduce to exactly 12.")
+        submitted = False
+    elif len(set(player_lines)) < len(player_lines):
+        st.error("⚠️ Duplicate player names detected. Please ensure all names are unique.")
         submitted = False
     else:
         submitted = st.form_submit_button("Start Tournament")
