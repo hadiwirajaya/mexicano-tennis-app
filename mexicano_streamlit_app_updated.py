@@ -13,19 +13,25 @@ if "scores" not in st.session_state:
 
 st.title("🎾 Mexicano Tennis Format")
 
-# Step 1: Player Input
+# Step 1: Player Input with Limit
 with st.form("player_input"):
     player_input = st.text_area("Enter 12 player names (one per line):", height=250)
-    submitted = st.form_submit_button("Start Tournament")
+    player_lines = player_input.strip().split("\n") if player_input.strip() else []
+    st.caption(f"Players entered: {len(player_lines)} / 12")
+    
+    if len(player_lines) > 12:
+        st.error("⚠️ You have entered more than 12 players. Please reduce to exactly 12.")
+        submitted = False
+    else:
+        submitted = st.form_submit_button("Start Tournament")
 
 if submitted:
-    players = player_input.strip().split("\n")
-    if len(players) != 12:
-        st.error("You must enter exactly 12 players.")
+    if len(player_lines) < 12:
+        st.error("⚠️ Please enter exactly 12 player names.")
     else:
-        random.shuffle(players)
-        st.session_state["players"] = players
-        st.session_state["scores"] = {p: 0 for p in players}
+        random.shuffle(player_lines)
+        st.session_state["players"] = player_lines
+        st.session_state["scores"] = {p: 0 for p in player_lines}
         st.session_state["round"] = 1
         st.session_state["matches"] = []
 
@@ -52,20 +58,19 @@ if st.session_state["players"]:
     elif st.session_state["round"] == 2:
         round_matches = [
             [players[8], players[9], players[10], players[11]],
-            # Match winners from previous round
-            sorted_players = sorted(scores.items(), key=lambda x: -x[1])
-            top8 = [p[0] for p in sorted_players[:8]]
-            [top8[0], top8[1], top8[2], top8[3]]
         ]
+        sorted_players = sorted(scores.items(), key=lambda x: -x[1])
+        top8 = [p[0] for p in sorted_players[:8]]
+        round_matches.append([top8[0], top8[1], top8[2], top8[3]])
     else:
         sorted_players = sorted(scores.items(), key=lambda x: -x[1])
         player_pool = [p[0] for p in sorted_players]
         round_matches = []
         for i in range(0, 12, 4):
-            if i+3 < len(player_pool):
+            if i + 3 < len(player_pool):
                 round_matches.append([
-                    player_pool[i], player_pool[i+1],
-                    player_pool[i+2], player_pool[i+3],
+                    player_pool[i], player_pool[i + 1],
+                    player_pool[i + 2], player_pool[i + 3],
                 ])
 
     # Step 3: Input scores for each match
