@@ -49,21 +49,22 @@ def main():
 
     # Step 1: Input players (only once)
     if len(st.session_state.players) != 12:
-        st.write("Enter exactly 12 unique player names (one per line):")
-        players_text = st.text_area("Players", default_players, height=250)
-        players_input = [p.strip() for p in players_text.splitlines() if p.strip()]
-        
-        if len(players_input) > 12:
-            st.error("Please enter no more than 12 players.")
-        elif len(set(players_input)) != len(players_input):
-            st.error("Please enter unique player names only.")
-        elif len(players_input) < 12:
-            st.info("Please enter exactly 12 players.")
-        else:
-            st.session_state.players = players_input
-            st.session_state.points = {p: 0 for p in players_input}
-            st.experimental_rerun()
-        return
+    st.write("Enter exactly 12 unique player names (one per line):")
+    players_text = st.text_area("Players", value=default_players, height=250)
+    players_input = [p.strip() for p in players_text.splitlines() if p.strip()]
+    
+    if len(players_input) > 12:
+        st.error("Please enter no more than 12 players.")
+    elif len(set(players_input)) != len(players_input):
+        st.error("Please enter unique player names only.")
+    elif len(players_input) < 12:
+        st.info("Please enter exactly 12 players.")
+    else:
+        st.session_state.players = players_input
+        st.session_state.points = {p: 0 for p in players_input}
+        st.experimental_rerun()
+    return
+
 
     st.write(f"### Round {st.session_state.round}")
 
