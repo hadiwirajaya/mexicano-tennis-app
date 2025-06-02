@@ -12,14 +12,12 @@ def init_session():
         st.session_state.matches = []
 
 def create_pairs(players_sorted):
-    # Pair players sequentially (1&2, 3&4, etc) for 2 courts (4 players per round)
     pairs = []
     for i in range(0, 8, 4):
-        # Court 1 match: pair first 2 players and next 2 players in this group of 4
         group = players_sorted[i:i+4]
         if len(group) < 4:
             break
-        pairs.append( ( (group[0], group[1]), (group[2], group[3]) ) )
+        pairs.append( ((group[0], group[1]), (group[2], group[3])) )
     return pairs
 
 def schedule_matches():
@@ -28,11 +26,9 @@ def schedule_matches():
     round_num = st.session_state.round
 
     if round_num == 1:
-        # Round 1 random pairs for first 8 players, last 4 rest or wait
         selected_players = players[:8]
         random.shuffle(selected_players)
     else:
-        # Sort by points desc, then shuffle within groups of 4 to mix partners/opponents
         sorted_players = sorted(points.items(), key=lambda x: x[1], reverse=True)
         sorted_players = [p for p, pts in sorted_players]
         selected_players = sorted_players[:8]
@@ -70,7 +66,6 @@ def input_scores():
 
         match["score"] = (s1, s2)
 
-        # Determine winner (no ties)
         if s1 > s2:
             winner = t1
         elif s2 > s1:
@@ -120,7 +115,6 @@ def main():
         winners = input_scores()
 
         if st.button("Submit Round Scores"):
-            # Check if all matches have valid winner
             if any(m["winner"] is None for m in st.session_state.matches):
                 st.error("No ties allowed. Please enter a valid winner for each match.")
             else:
