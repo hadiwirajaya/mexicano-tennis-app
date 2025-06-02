@@ -1,144 +1,124 @@
 import streamlit as st
-import random
 
-def init_session_state():
+def create_round_matches(players, round_num, prev_winners=None):
+    """Generate matches for each round based on Mexicano format and round number."""
+    matches = []
+    if round_num == 1:
+        # Round 1: 2 courts, fixed players
+        matches = [
+            {"court": 1, "team1": (players[0], players[1]), "team2": (players[2], players[3]), "score": (0, 0), "winner": None},
+            {"court": 2, "team1": (players[4], players[5]), "team2": (players[6], players[7]), "score": (0, 0), "winner": None},
+        ]
+    elif round_num == 2:
+        # Round 2: court 1 fixed players 9-12, court 2 winners of round 1
+        if prev_winners and len(prev_winners) == 2:
+            matches = [
+                {"court": 1, "team1": (players[8], players[9]), "team2": (players[10], players[11]), "score": (0, 0), "winner": None},
+                {"court": 2, "team1": prev_winners[0], "team2": prev_winners[1], "score": (0, 0), "winner": None},
+            ]
+    else:
+        # Round 3 and onwards: 2 courts, match winners vs each other
+        if prev_winners and len(prev_winners) == 4:
+            matches = [
+                {"court": 1, "team1": prev_winners[0], "team2": prev_winners[1], "score": (0, 0), "winner": None},
+                {"court": 2, "team1": prev_winners[2], "team2": prev_winners[3], "score": (0, 0), "winner": None},
+            ]
+        elif prev_winners and len(prev_winners) == 2:
+            # Final round or last match - single court only
+            matches = [
+                {"court": 1, "team1": prev_winners[0], "team2": prev_winners[1], "score": (0, 0), "winner": None},
+            ]
+    return matches
+
+def format_team(team):
+    return f"{team[0]} & {team[1]}"
+
+def main():
+    st.title("Mexicano Format Tennis/Padel Tournament")
+
+    default_players = "\n".join([f"player_{i}" for i in range(1, 13)])
+
     if "players" not in st.session_state:
         st.session_state.players = []
     if "round" not in st.session_state:
         st.session_state.round = 1
-    if "points" not in st.session_state:
-        st.session_state.points = {}
     if "matches" not in st.session_state:
         st.session_state.matches = []
+    if "points" not in st.session_state:
+        st.session_state.points = {}
 
-def create_round_matches(players):
-    # For round 1 and others: 
-    # Court 1: players 1 & 2 vs 3 & 4
-    # Court 2: players 5 & 6 vs 7 & 8
-    # Next round: Court 1: players 9 & 10 vs 11 & 12
-    # Court 2: winner of Court1 vs winner of Court2
-    
-    matches = []
-    if st.session_state.round == 1:
-        # First 8 players in two matches on 2 courts
-        matches.append({
-            "court": 1,
-            "team1": (players[0], players[1]),
-            "team2": (players[2], players[3]),
-            "score": (0,0),
-            "winner": None
-        })
-        matches.append({
-            "court": 2,
-            "team1": (players[4], players[5]),
-            "team2": (players[6], players[7]),
-            "score": (0,0),
-            "winner": None
-        })
-    elif st.session_state.round == 2:
-        # Court 1: players 9,10 vs 11,12
-        matches.append({
-            "court": 1,
-            "team1": (players[8], players[9]),
-            "team2": (players[10], players[11]),
-            "score": (0,0),
-            "winner": None
-        })
-        # Court 2: winners from previous round matches
-        prev_winners = [m["winner"] for m in st.session_state.matches if m["winner"]]
-        if len(prev_winners) == 2:
-            matches.append({
-                "court": 2,
-                "team1": prev_winners[0],
-                "team2": prev_winners[1],
-                "score": (0,0),
-                "winner": None
-            })
-    else:
-        # For later rounds, you can customize or stop
-        matches = []
-
-    return matches
-
-def update_points(winners):
-    for winner in winners:
-        if winner is None:
-            continue
-        for player in winner:
-            st.session_state.points[player] = st.session_state.points.get(player, 0) + 1
-
-def main():
-    st.title("Mexicano Format Padel/Tennis Scheduler (12 players, 2 courts)")
-
-    init_session_state()
-
-    if not st.session_state.players:
-        st.write("Enter exactly 12 unique player names, one per line:")
-        players_input = st.text_area("Players:", height=280)
-
-        if st.button("Submit Players"):
-            players = [p.strip() for p in players_input.strip().split("\n") if p.strip()]
-            if len(players) != 12:
-                st.error("Please enter exactly 12 players.")
-            elif len(set(players)) != 12:
-                st.error("Duplicate player names detected.")
-            else:
-                st.session_state.players = players
-                st.session_state.points = {p: 0 for p in players}
-                st.session_state.round = 1
-                st.session_state.matches = create_round_matches(players)
-                st.experimental_rerun()
-    else:
-        st.write(f"### Round {st.session_state.round}")
+    # Step 1: Input players (only once)
+    if len(st.session_state.players) != 12:
+        st.write("Enter exactly 12 unique player names (one per line):")
+        players_text = st.text_area("Players", default_players, height=250)
+        players_input = [p.strip() for p in players_text.splitlines() if p.strip()]
         
-        winners = []
-        for match in st.session_state.matches:
-            st.write(f"**Court {match['court']}**")
-            st.write(f"Team 1: {match['team1'][0]} & {match['team1'][1]}")
-            st.write(f"Team 2: {match['team2'][0]} & {match['team2'][1]}")
+        if len(players_input) > 12:
+            st.error("Please enter no more than 12 players.")
+        elif len(set(players_input)) != len(players_input):
+            st.error("Please enter unique player names only.")
+        elif len(players_input) < 12:
+            st.info("Please enter exactly 12 players.")
+        else:
+            st.session_state.players = players_input
+            st.session_state.points = {p: 0 for p in players_input}
+            st.experimental_rerun()
+        return
 
-            col1, col2 = st.columns(2)
-            with col1:
-                score1 = st.number_input(f"Score Team 1 (Court {match['court']})", 0, 4, key=f"s1_{match['court']}")
-            with col2:
-                score2 = st.number_input(f"Score Team 2 (Court {match['court']})", 0, 4, key=f"s2_{match['court']}")
+    st.write(f"### Round {st.session_state.round}")
 
-            if score1 == score2:
-                st.warning("Ties not allowed. Please enter a winner.")
-                match["winner"] = None
-            elif score1 > score2:
-                match["winner"] = match["team1"]
+    # Step 2: If no matches for this round, create them
+    if not st.session_state.matches:
+        prev_winners = None
+        if st.session_state.round > 1:
+            prev_winners = [m["winner"] for m in st.session_state.matches_prev_round if m["winner"]]
+        st.session_state.matches = create_round_matches(st.session_state.players, st.session_state.round, prev_winners)
+        st.session_state.matches_prev_round = st.session_state.matches.copy()
+
+    # Step 3: Show matches and input scores
+    winners = []
+    all_scores_entered = True
+
+    for i, match in enumerate(st.session_state.matches):
+        st.write(f"**Court {match['court']}**: {format_team(match['team1'])} vs {format_team(match['team2'])}")
+        c1_score = st.number_input(f"Score for {format_team(match['team1'])}", min_value=0, max_value=4, key=f"c1_score_{i}")
+        c2_score = st.number_input(f"Score for {format_team(match['team2'])}", min_value=0, max_value=4, key=f"c2_score_{i}")
+
+        if c1_score == c2_score:
+            st.warning("Ties are not allowed. Please enter a clear winner.")
+            all_scores_entered = False
+
+        elif c1_score == 0 and c2_score == 0:
+            all_scores_entered = False  # no score entered yet
+
+        else:
+            if c1_score > c2_score:
+                winner = match['team1']
             else:
-                match["winner"] = match["team2"]
+                winner = match['team2']
+            winners.append(winner)
+            match['score'] = (c1_score, c2_score)
+            match['winner'] = winner
 
-            match["score"] = (score1, score2)
-            winners.append(match["winner"])
+    if st.button("Submit Round Scores"):
+        if not all_scores_entered:
+            st.error("Please enter all scores and no ties allowed before submitting.")
+        else:
+            for winner in winners:
+                for p in winner:
+                    st.session_state.points[p] += 1
 
-            st.write("---")
+            st.session_state.matches_prev_round = st.session_state.matches.copy()
+            st.session_state.round += 1
+            st.session_state.matches = []
 
-        if st.button("Submit Round Scores"):
-            if None in winners:
-                st.error("All matches must have a winner before submitting.")
-            else:
-                update_points(winners)
-                st.success("Scores submitted!")
+            st.experimental_rerun()
 
-                # Show points table
-                st.write("### Current Points:")
-                sorted_pts = sorted(st.session_state.points.items(), key=lambda x: x[1], reverse=True)
-                for p, pts in sorted_pts:
-                    st.write(f"{p}: {pts}")
-
-                # Advance round
-                st.session_state.round += 1
-                # Schedule new round matches
-                st.session_state.matches = create_round_matches(st.session_state.players)
-                st.experimental_rerun()
-
-        st.write("### Current Points:")
-        sorted_pts = sorted(st.session_state.points.items(), key=lambda x: x[1], reverse=True)
-        for p, pts in sorted_pts:
-            st.write(f"{p}: {pts}")
+    # Step 4: Show current points leaderboard
+    st.write("### Points Leaderboard")
+    sorted_points = sorted(st.session_state.points.items(), key=lambda x: x[1], reverse=True)
+    for p, pts in sorted_points:
+        st.write(f"{p}: {pts}")
 
 if __name__ == "__main__":
     main()
