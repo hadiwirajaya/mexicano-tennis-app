@@ -58,7 +58,7 @@ def main():
         else:
             st.session_state.players = players_input
             st.session_state.points = {p: 0 for p in players_input}
-            st.experimental_rerun()
+            st.rerun()
         return
 
     st.write(f"### 🏁 Round {st.session_state.round}")
@@ -107,7 +107,7 @@ def main():
                     st.session_state.points[p] += 1
             st.session_state.round += 1
             st.session_state.matches = []
-            st.experimental_rerun()
+            st.rerun()
 
     # Step 4: Show leaderboard
     st.write("### 🏆 Leaderboard")
