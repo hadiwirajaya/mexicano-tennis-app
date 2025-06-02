@@ -1,101 +1,143 @@
 import streamlit as st
 import random
 
-# Initialize session state
-if "players" not in st.session_state:
-    st.session_state["players"] = []
-if "round" not in st.session_state:
-    st.session_state["round"] = 1
-if "matches" not in st.session_state:
-    st.session_state["matches"] = []
-if "scores" not in st.session_state:
-    st.session_state["scores"] = {}
+def init_session():
+    if "players" not in st.session_state:
+        st.session_state.players = []
+    if "round" not in st.session_state:
+        st.session_state.round = 1
+    if "points" not in st.session_state:
+        st.session_state.points = {}
+    if "matches" not in st.session_state:
+        st.session_state.matches = []
 
-st.title("🎾 Mexicano Tennis Format")
+def create_pairs(players_sorted):
+    # Pair players sequentially (1&2, 3&4, etc) for 2 courts (4 players per round)
+    pairs = []
+    for i in range(0, 8, 4):
+        # Court 1 match: pair first 2 players and next 2 players in this group of 4
+        group = players_sorted[i:i+4]
+        if len(group) < 4:
+            break
+        pairs.append( ( (group[0], group[1]), (group[2], group[3]) ) )
+    return pairs
 
-# Step 1: Player Input with Limit
-with st.form("player_input"):
-    player_input = st.text_area("Enter 12 player names (one per line):", height=250)
-    # Clean input: remove empty lines and extra whitespace
-    player_lines = [line.strip() for line in player_input.strip().split("\n") if line.strip()]
-    st.caption(f"Players entered: {len(player_lines)} / 12")
+def schedule_matches():
+    players = st.session_state.players
+    points = st.session_state.points
+    round_num = st.session_state.round
 
-    if len(player_lines) > 12:
-        st.error("⚠️ You have entered more than 12 players. Please reduce to exactly 12.")
-        submitted = False
-    elif len(set(player_lines)) < len(player_lines):
-        st.error("⚠️ Duplicate player names detected. Please ensure all names are unique.")
-        submitted = False
+    if round_num == 1:
+        # Round 1 random pairs for first 8 players, last 4 rest or wait
+        selected_players = players[:8]
+        random.shuffle(selected_players)
     else:
-        submitted = st.form_submit_button("Start Tournament")
+        # Sort by points desc, then shuffle within groups of 4 to mix partners/opponents
+        sorted_players = sorted(points.items(), key=lambda x: x[1], reverse=True)
+        sorted_players = [p for p, pts in sorted_players]
+        selected_players = sorted_players[:8]
 
-if submitted:
-    if len(player_lines) < 12:
-        st.error("⚠️ Please enter exactly 12 player names.")
+    pairs = create_pairs(selected_players)
+    st.session_state.matches = []
+
+    court_num = 1
+    for pair in pairs:
+        st.session_state.matches.append({
+            "court": court_num,
+            "teams": pair,
+            "score": None,
+            "winner": None
+        })
+        court_num += 1
+
+def input_scores():
+    new_matches = []
+    winners = []
+    for match in st.session_state.matches:
+        court = match["court"]
+        t1 = match["teams"][0]
+        t2 = match["teams"][1]
+
+        st.write(f"**Court {court}**")
+        st.write(f"Team 1: {t1[0]} & {t1[1]}")
+        st.write(f"Team 2: {t2[0]} & {t2[1]}")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            s1 = st.number_input(f"Score Team 1 (0-4)", min_value=0, max_value=4, key=f"score_{court}_1", value=0)
+        with col2:
+            s2 = st.number_input(f"Score Team 2 (0-4)", min_value=0, max_value=4, key=f"score_{court}_2", value=0)
+
+        match["score"] = (s1, s2)
+
+        # Determine winner (no ties)
+        if s1 > s2:
+            winner = t1
+        elif s2 > s1:
+            winner = t2
+        else:
+            winner = None
+
+        match["winner"] = winner
+        new_matches.append(match)
+        winners.append(winner)
+
+    st.session_state.matches = new_matches
+    return winners
+
+def update_points(winners):
+    for winner in winners:
+        if winner is None:
+            continue
+        for player in winner:
+            st.session_state.points[player] = st.session_state.points.get(player, 0) + 1
+
+def main():
+    st.title("Mexicano Format Padel Scheduler - 12 Players, 2 Courts")
+
+    init_session()
+
+    if not st.session_state.players:
+        st.write("Enter exactly 12 unique player names (one per line):")
+        players_text = st.text_area("Players:", height=300)
+        if st.button("Submit Players"):
+            players = [p.strip() for p in players_text.strip().split("\n") if p.strip()]
+            if len(players) != 12:
+                st.error("Please enter exactly 12 player names.")
+            elif len(set(players)) != 12:
+                st.error("Duplicate names detected. Please enter unique names.")
+            else:
+                st.session_state.players = players
+                st.session_state.points = {p:0 for p in players}
+                st.session_state.round = 1
+                schedule_matches()
+                st.experimental_rerun()
     else:
-        random.shuffle(player_lines)
-        st.session_state["players"] = player_lines
-        st.session_state["scores"] = {p: 0 for p in player_lines}
-        st.session_state["round"] = 1
-        st.session_state["matches"] = []
+        st.write(f"### Round {st.session_state.round}")
+        if not st.session_state.matches:
+            schedule_matches()
 
-# Display players and scores
-if st.session_state["players"]:
-    st.subheader("Current Scores")
-    sorted_scores = sorted(st.session_state["scores"].items(), key=lambda x: -x[1])
-    for p, s in sorted_scores:
-        st.write(f"{p}: {s} points")
+        winners = input_scores()
 
-    # Step 2: Display Matches for Current Round
-    st.subheader(f"Round {st.session_state['round']} Matches")
+        if st.button("Submit Round Scores"):
+            # Check if all matches have valid winner
+            if any(m["winner"] is None for m in st.session_state.matches):
+                st.error("No ties allowed. Please enter a valid winner for each match.")
+            else:
+                update_points(winners)
+                st.success("Scores submitted!")
 
-    match_results = []
-    players = st.session_state["players"]
-    scores = st.session_state["scores"]
+                st.write("### Current Points")
+                for p, pts in sorted(st.session_state.points.items(), key=lambda x: x[1], reverse=True):
+                    st.write(f"{p}: {pts}")
 
-    # Generate matches
-    if st.session_state["round"] == 1:
-        round_matches = [
-            [players[0], players[1], players[2], players[3]],
-            [players[4], players[5], players[6], players[7]],
-        ]
-    elif st.session_state["round"] == 2:
-        round_matches = [
-            [players[8], players[9], players[10], players[11]],
-        ]
-        sorted_players = sorted(scores.items(), key=lambda x: -x[1])
-        top8 = [p[0] for p in sorted_players[:8]]
-        round_matches.append([top8[0], top8[1], top8[2], top8[3]])
-    else:
-        sorted_players = sorted(scores.items(), key=lambda x: -x[1])
-        player_pool = [p[0] for p in sorted_players]
-        round_matches = []
-        for i in range(0, 12, 4):
-            if i + 3 < len(player_pool):
-                round_matches.append([
-                    player_pool[i], player_pool[i + 1],
-                    player_pool[i + 2], player_pool[i + 3],
-                ])
+                st.session_state.round += 1
+                schedule_matches()
+                st.experimental_rerun()
 
-    # Step 3: Input scores for each match
-    with st.form(f"round_{st.session_state['round']}_form"):
-        for idx, match in enumerate(round_matches):
-            st.markdown(f"**Court {idx+1}: {match[0]} & {match[1]} vs {match[2]} & {match[3]}**")
-            c1_s1 = st.number_input(f"{match[0]} & {match[1]} score", min_value=0, max_value=4, key=f"{idx}_team1")
-            c1_s2 = st.number_input(f"{match[2]} & {match[3]} score", min_value=0, max_value=4, key=f"{idx}_team2")
-            match_results.append((match, c1_s1, c1_s2))
+        st.write("### Current Points")
+        for p, pts in sorted(st.session_state.points.items(), key=lambda x: x[1], reverse=True):
+            st.write(f"{p}: {pts}")
 
-        submitted_scores = st.form_submit_button("Submit Scores")
-
-    # Step 4: Update scores
-    if submitted_scores:
-        for match, s1, s2 in match_results:
-            st.session_state["scores"][match[0]] += s1
-            st.session_state["scores"][match[1]] += s1
-            st.session_state["scores"][match[2]] += s2
-            st.session_state["scores"][match[3]] += s2
-            st.session_state["matches"].append((match, s1, s2))
-
-        st.success(f"Scores submitted for Round {st.session_state['round']}!")
-        st.session_state["round"] += 1
-        st.experimental_rerun()
+if __name__ == "__main__":
+    main()
